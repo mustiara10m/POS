@@ -214,8 +214,8 @@
 
     <!-- LOGIC JAVASCRIPT LENGKAP -->
     <script>
-        // URL WEB APP DARI GOOGLE APPS SCRIPT ANDA
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby-aApRxnxXzBEPIwtrSSschXUDa0FmENnGaTzHV5TcehzqS-KvhHJ0mTEhdoG7s6mn/exec';
+        // URL WEB APP APPS SCRIPT BARU
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyI1NbxsT60eNAm2L-JpZwbIhbNxHtXcxJhQKIMCWOuH8NvmRKZI1kOYEBuAepIy0Zyw/exec';
 
         // State Data
         let currentUser = null; 
@@ -241,10 +241,18 @@
             `;
 
             try {
-                const response = await fetch(SCRIPT_URL);
+                const response = await fetch(SCRIPT_URL, {
+                    method: 'GET',
+                    redirect: 'follow'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const data = await response.json();
                 
-                if (Array.isArray(data) && data.length > 0) {
+                if (Array.isArray(data)) {
                     menuData = data;
                 } else {
                     menuData = [];
