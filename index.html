@@ -189,7 +189,7 @@
             <div class="bg-gray-50 p-4 rounded-lg text-left text-sm space-y-2 border">
                 <div class="flex justify-between text-xs text-gray-500">
                     <span>ID Penjualan:</span>
-                    <span id="receipt-id" class="font-bold text-indigo-600">TRX-000000</span>
+                    <span id="receipt-id" class="font-bold text-indigo-600">Memproses...</span>
                 </div>
                 <div class="flex justify-between border-t pt-2">
                     <span class="text-gray-500">Jumlah Produk:</span>
@@ -279,11 +279,11 @@
             }
         }
 
-        async function saveTransactionToSheet(transactionId, itemsDetail, total, paid, change, method) {
+        // Simpan transaksi dan dapatkan ID Penjualan otomatis dari Google Sheets (TRX-0001, dst)
+        async function saveTransactionToSheet(itemsDetail, total, paid, change, method) {
             const payload = {
                 action: 'saveTransaction',
                 data: {
-                    transactionId: transactionId,
                     items: itemsDetail,
                     total: total,
                     paid: paid,
@@ -293,12 +293,16 @@
             };
 
             try {
-                await fetch(SCRIPT_URL, {
+                const response = await fetch(SCRIPT_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify(payload)
                 });
-                console.log("Transaksi tersimpan di Google Sheets!");
+
+                const result = await response.json();
+                if (result.status === "success" && result.transactionId) {
+                    document.getElementById('receipt-id').innerText = result.transactionId;
+                }
             } catch (err) {
                 console.error("Error simpan transaksi:", err);
             }
@@ -581,21 +585,18 @@
         }
 
         function showReceiptModal(total, paid, change) {
-            // Generate ID Penjualan Unik (contoh: TRX-839201)
-            const transactionId = 'TRX-' + Math.floor(100000 + Math.random() * 900000);
-            
-            // Format daftar produk terjual (Misal: "Kopi Hitam (2x), Roti Bakar (1x)")
-            const itemsDetail = cart.map(item => `${item.name} (${item.qty}x)`).join(', ');
+            document.getElementById('receipt-id').innerText = 'Memproses...';
 
+            const itemsDetail = cart.map(item => `${item.name} (${item.qty}x)`).join(', ');
             const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
-            document.getElementById('receipt-id').innerText = transactionId;
+
             document.getElementById('receipt-qty').innerText = totalQty + ' Produk';
             document.getElementById('receipt-total').innerText = formatRp(total);
             document.getElementById('receipt-pay').innerText = formatRp(paid);
             document.getElementById('receipt-change').innerText = formatRp(change);
 
-            // Kirim transaksi + ID + daftar item ke Google Sheets
-            saveTransactionToSheet(transactionId, itemsDetail, total, paid, change, activePaymentMethod.toUpperCase());
+            // Kirim transaksi ke Google Sheets
+            saveTransactionToSheet(itemsDetail, total, paid, change, activePaymentMethod.toUpperCase());
 
             document.getElementById('modal-receipt').classList.remove('hidden');
         }
