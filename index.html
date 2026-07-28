@@ -130,7 +130,7 @@
                     </button>
                 </div>
 
-                <!-- FORM PEMBAYARAN CASH (DENGAN PINTASAN NOMINAL UANG) -->
+                <!-- FORM PEMBAYARAN CASH -->
                 <div id="payment-cash-section" class="space-y-4 border-t pt-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Jumlah Uang Pembeli (Rp)</label>
@@ -209,7 +209,7 @@
                 </div>
             </div>
 
-            <p class="text-xs text-gray-400">Data telah otomatis terkirim ke Google Sheets.</p>
+            <p class="text-xs text-gray-400">Data telah otomatis terkirim ke Google Sheets (1 Menu per Baris).</p>
 
             <button onclick="finishTransaction()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg transition">
                 Selesai & Kembali ke Penjualan
@@ -279,12 +279,12 @@
             }
         }
 
-        // Simpan transaksi dan dapatkan ID Penjualan otomatis dari Google Sheets (TRX-0001, dst)
-        async function saveTransactionToSheet(itemsDetail, total, paid, change, method) {
+        // Simpan transaksi (Mengirimkan Array Item agar di Sheet jadi 1 Menu = 1 Baris)
+        async function saveTransactionToSheet(itemsArray, total, paid, change, method) {
             const payload = {
                 action: 'saveTransaction',
                 data: {
-                    items: itemsDetail,
+                    items: itemsArray, // Array: [{name: "Nasi Goreng", qty: 2}, {name: "Es Teh", qty: 1}]
                     total: total,
                     paid: paid,
                     change: change,
@@ -587,7 +587,12 @@
         function showReceiptModal(total, paid, change) {
             document.getElementById('receipt-id').innerText = 'Memproses...';
 
-            const itemsDetail = cart.map(item => `${item.name} (${item.qty}x)`).join(', ');
+            // Kirim array berisi objek { name, qty } agar di Apps Script bisa dimasukkan per baris
+            const itemsArray = cart.map(item => ({
+                name: item.name,
+                qty: item.qty
+            }));
+
             const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
 
             document.getElementById('receipt-qty').innerText = totalQty + ' Produk';
@@ -596,7 +601,7 @@
             document.getElementById('receipt-change').innerText = formatRp(change);
 
             // Kirim transaksi ke Google Sheets
-            saveTransactionToSheet(itemsDetail, total, paid, change, activePaymentMethod.toUpperCase());
+            saveTransactionToSheet(itemsArray, total, paid, change, activePaymentMethod.toUpperCase());
 
             document.getElementById('modal-receipt').classList.remove('hidden');
         }
