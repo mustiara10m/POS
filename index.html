@@ -231,9 +231,15 @@
                 <input type="number" id="menu-price" placeholder="Misal: 15000" class="w-full p-2 border rounded-lg mt-1 outline-none">
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-700">URL Gambar (Opsional)</label>
-                <input type="url" id="menu-image" placeholder="https://domain.com/gambar.jpg" class="w-full p-2 border rounded-lg mt-1 outline-none text-sm">
-                <p class="text-[11px] text-gray-400 mt-1">Kosongkan jika ingin menggunakan gambar default (Garpu & Pisau).</p>
+                <label class="block text-sm font-medium text-gray-700">Upload Gambar Dari Perangkat/Komputer</label>
+                <input type="file" id="menu-file" accept="image/*" onchange="previewImage(event)" class="w-full p-2 border rounded-lg mt-1 text-sm bg-gray-50 cursor-pointer">
+                <input type="hidden" id="menu-image-base64">
+                
+                <!-- Pratinjau Gambar -->
+                <div id="image-preview-container" class="hidden mt-2 flex items-center gap-3 p-2 border rounded-lg bg-gray-50">
+                    <img id="image-preview" src="" class="w-12 h-12 object-cover rounded-md">
+                    <span class="text-xs text-green-600 font-semibold"><i class="fa-solid fa-circle-check"></i> Gambar Siap Disimpan</span>
+                </div>
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <button onclick="closeMenuModal()" class="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-100">Batal</button>
@@ -383,7 +389,6 @@
                 const card = document.createElement('div');
                 card.className = "bg-white border rounded-xl p-3 flex flex-col justify-between hover:shadow-md transition relative group";
                 
-                // Cek apakah ada URL gambar
                 const imageContainer = item.imageUrl ? 
                     `<img src="${item.imageUrl}" alt="${item.name}" class="h-24 w-full object-cover rounded-lg mb-2" onerror="this.onerror=null; this.src=''; this.parentNode.innerHTML='<div class=\\'h-24 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-400 mb-2\\'><i class=\\'fa-solid fa-utensils text-2xl\\'></i></div>';">` :
                     `<div class="h-24 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-400 mb-2">
@@ -411,7 +416,88 @@
             });
         }
 
-        // ================= 4. MANAJEMEN KERANJANG =================
+        // ================= 4. CONVERT GAMPANG KEDALAM BASE64 =================
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Ukuran file maksimal 1MB agar tidak memberatkan Google Sheets
+            if (file.size > 1024 * 1024) {
+                alert("Ukuran gambar terlalu besar! Pilih gambar di bawah 1MB.");
+                event.target.value = "";
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const base64String = e.target.result;
+                document.getElementById('menu-image-base64').value = base64String;
+                document.getElementById('image-preview').src = base64String;
+                document.getElementById('image-preview-container').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ================= 5. EDIT & TAMBAH MENU =================
+        function openAddMenuModal() {
+            document.getElementById('modal-menu-title').innerText = 'Tambah Menu Baru';
+            document.getElementById('menu-id').value = '';
+            document.getElementById('menu-name').value = '';
+            document.getElementById('menu-price').value = '';
+            document.getElementById('menu-file').value = '';
+            document.getElementById('menu-image-base64').value = '';
+            document.getElementById('image-preview-container').classList.add('hidden');
+            document.getElementById('modal-menu').classList.remove('hidden');
+        }
+
+        function openEditMenuModal(id) {
+            const item = menuData.find(m => String(m.id) === String(id));
+            if (!item) return;
+            document.getElementById('modal-menu-title').innerText = 'Edit Menu';
+            document.getElementById('menu-id').value = item.id;
+            document.getElementById('menu-name').value = item.name;
+            document.getElementById('menu-price').value = item.price;
+            document.getElementById('menu-file').value = '';
+            document.getElementById('menu-image-base64').value = item.imageUrl || '';
+
+            if (item.imageUrl) {
+                document.getElementById('image-preview').src = item.imageUrl;
+                document.getElementById('image-preview-container').classList.remove('hidden');
+            } else {
+                document.getElementById('image-preview-container').classList.add('hidden');
+            }
+
+            document.getElementById('modal-menu').classList.remove('hidden');
+        }
+
+        function closeMenuModal() {
+            document.getElementById('modal-menu').classList.add('hidden');
+        }
+
+        async function saveMenu() {
+            const id = document.getElementById('menu-id').value || Date.now().toString();
+            const name = document.getElementById('menu-name').value.trim();
+            const price = parseFloat(document.getElementById('menu-price').value);
+            const imageUrl = document.getElementById('menu-image-base64').value;
+
+            if (!name || isNaN(price)) {
+                alert('Isi nama dan harga menu dengan benar!');
+                return;
+            }
+
+            const btnSave = document.getElementById('btn-save-menu');
+            btnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
+            btnSave.disabled = true;
+
+            await saveMenuToSheet(id, name, price, imageUrl);
+
+            btnSave.innerText = "Simpan";
+            btnSave.disabled = false;
+            closeMenuModal();
+            await loadMenuFromSheet();
+        }
+
+        // ================= 6. MANAJEMEN KERANJANG =================
         function addToCart(productId) {
             const product = menuData.find(m => String(m.id) === String(productId));
             const exist = cart.find(c => String(c.id) === String(productId));
@@ -471,55 +557,7 @@
             document.getElementById('btn-checkout').disabled = false;
         }
 
-        // ================= 5. EDIT & TAMBAH MENU =================
-        function openAddMenuModal() {
-            document.getElementById('modal-menu-title').innerText = 'Tambah Menu Baru';
-            document.getElementById('menu-id').value = '';
-            document.getElementById('menu-name').value = '';
-            document.getElementById('menu-price').value = '';
-            document.getElementById('menu-image').value = '';
-            document.getElementById('modal-menu').classList.remove('hidden');
-        }
-
-        function openEditMenuModal(id) {
-            const item = menuData.find(m => String(m.id) === String(id));
-            if (!item) return;
-            document.getElementById('modal-menu-title').innerText = 'Edit Menu';
-            document.getElementById('menu-id').value = item.id;
-            document.getElementById('menu-name').value = item.name;
-            document.getElementById('menu-price').value = item.price;
-            document.getElementById('menu-image').value = item.imageUrl || '';
-            document.getElementById('modal-menu').classList.remove('hidden');
-        }
-
-        function closeMenuModal() {
-            document.getElementById('modal-menu').classList.add('hidden');
-        }
-
-        async function saveMenu() {
-            const id = document.getElementById('menu-id').value || Date.now().toString();
-            const name = document.getElementById('menu-name').value.trim();
-            const price = parseFloat(document.getElementById('menu-price').value);
-            const imageUrl = document.getElementById('menu-image').value.trim();
-
-            if (!name || isNaN(price)) {
-                alert('Isi nama dan harga menu dengan benar!');
-                return;
-            }
-
-            const btnSave = document.getElementById('btn-save-menu');
-            btnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
-            btnSave.disabled = true;
-
-            await saveMenuToSheet(id, name, price, imageUrl);
-
-            btnSave.innerText = "Simpan";
-            btnSave.disabled = false;
-            closeMenuModal();
-            await loadMenuFromSheet();
-        }
-
-        // ================= 6. CHECKOUT & PINTASAN NOMINAL =================
+        // ================= 7. CHECKOUT & PINTASAN NOMINAL =================
         function goToCheckout() {
             document.getElementById('page-pos').classList.add('hidden');
             document.getElementById('page-checkout').classList.remove('hidden');
