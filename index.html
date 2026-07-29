@@ -224,11 +224,16 @@
             <input type="hidden" id="menu-id">
             <div>
                 <label class="block text-sm font-medium text-gray-700">Nama Menu</label>
-                <input type="text" id="menu-name" class="w-full p-2 border rounded-lg mt-1 outline-none">
+                <input type="text" id="menu-name" placeholder="Misal: Nasi Goreng" class="w-full p-2 border rounded-lg mt-1 outline-none">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-700">Harga (Rp)</label>
-                <input type="number" id="menu-price" class="w-full p-2 border rounded-lg mt-1 outline-none">
+                <input type="number" id="menu-price" placeholder="Misal: 15000" class="w-full p-2 border rounded-lg mt-1 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">URL Gambar (Opsional)</label>
+                <input type="url" id="menu-image" placeholder="https://domain.com/gambar.jpg" class="w-full p-2 border rounded-lg mt-1 outline-none text-sm">
+                <p class="text-[11px] text-gray-400 mt-1">Kosongkan jika ingin menggunakan gambar default (Garpu & Pisau).</p>
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <button onclick="closeMenuModal()" class="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-100">Batal</button>
@@ -279,12 +284,11 @@
             }
         }
 
-        // Simpan transaksi (Mengirimkan Array Item agar di Sheet jadi 1 Menu = 1 Baris)
         async function saveTransactionToSheet(itemsArray, total, paid, change, method) {
             const payload = {
                 action: 'saveTransaction',
                 data: {
-                    items: itemsArray, // Array: [{name: "Nasi Goreng", qty: 2}, {name: "Es Teh", qty: 1}]
+                    items: itemsArray,
                     total: total,
                     paid: paid,
                     change: change,
@@ -308,10 +312,10 @@
             }
         }
 
-        async function saveMenuToSheet(id, name, price) {
+        async function saveMenuToSheet(id, name, price, imageUrl) {
             const payload = {
                 action: 'saveMenu',
-                data: { id, name, price }
+                data: { id, name, price, imageUrl }
             };
 
             try {
@@ -379,11 +383,16 @@
                 const card = document.createElement('div');
                 card.className = "bg-white border rounded-xl p-3 flex flex-col justify-between hover:shadow-md transition relative group";
                 
+                // Cek apakah ada URL gambar
+                const imageContainer = item.imageUrl ? 
+                    `<img src="${item.imageUrl}" alt="${item.name}" class="h-24 w-full object-cover rounded-lg mb-2" onerror="this.onerror=null; this.src=''; this.parentNode.innerHTML='<div class=\\'h-24 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-400 mb-2\\'><i class=\\'fa-solid fa-utensils text-2xl\\'></i></div>';">` :
+                    `<div class="h-24 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-400 mb-2">
+                        <i class="fa-solid fa-utensils text-2xl"></i>
+                    </div>`;
+
                 card.innerHTML = `
                     <div>
-                        <div class="h-20 bg-indigo-50 rounded-lg flex items-center justify-center text-indigo-400 mb-2">
-                            <i class="fa-solid fa-utensils text-2xl"></i>
-                        </div>
+                        ${imageContainer}
                         <h3 class="font-bold text-gray-800 text-sm leading-tight">${item.name}</h3>
                         <p class="text-xs text-indigo-600 font-bold mt-1">${formatRp(item.price)}</p>
                     </div>
@@ -468,6 +477,7 @@
             document.getElementById('menu-id').value = '';
             document.getElementById('menu-name').value = '';
             document.getElementById('menu-price').value = '';
+            document.getElementById('menu-image').value = '';
             document.getElementById('modal-menu').classList.remove('hidden');
         }
 
@@ -478,6 +488,7 @@
             document.getElementById('menu-id').value = item.id;
             document.getElementById('menu-name').value = item.name;
             document.getElementById('menu-price').value = item.price;
+            document.getElementById('menu-image').value = item.imageUrl || '';
             document.getElementById('modal-menu').classList.remove('hidden');
         }
 
@@ -489,6 +500,7 @@
             const id = document.getElementById('menu-id').value || Date.now().toString();
             const name = document.getElementById('menu-name').value.trim();
             const price = parseFloat(document.getElementById('menu-price').value);
+            const imageUrl = document.getElementById('menu-image').value.trim();
 
             if (!name || isNaN(price)) {
                 alert('Isi nama dan harga menu dengan benar!');
@@ -499,7 +511,7 @@
             btnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
             btnSave.disabled = true;
 
-            await saveMenuToSheet(id, name, price);
+            await saveMenuToSheet(id, name, price, imageUrl);
 
             btnSave.innerText = "Simpan";
             btnSave.disabled = false;
@@ -587,7 +599,6 @@
         function showReceiptModal(total, paid, change) {
             document.getElementById('receipt-id').innerText = 'Memproses...';
 
-            // Kirim array berisi objek { name, qty } agar di Apps Script bisa dimasukkan per baris
             const itemsArray = cart.map(item => ({
                 name: item.name,
                 qty: item.qty
@@ -600,7 +611,6 @@
             document.getElementById('receipt-pay').innerText = formatRp(paid);
             document.getElementById('receipt-change').innerText = formatRp(change);
 
-            // Kirim transaksi ke Google Sheets
             saveTransactionToSheet(itemsArray, total, paid, change, activePaymentMethod.toUpperCase());
 
             document.getElementById('modal-receipt').classList.remove('hidden');
